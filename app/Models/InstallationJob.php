@@ -8,6 +8,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InstallationJob extends Model
 {
+
+    protected $fillable = [
+        'job_title',
+        'job_reference_id',
+        'technician_id',
+        'odp_asset_id',
+        'job_type',
+        'status',
+        'proposed_latitude',
+        'proposed_longitude',
+        'rab_estimated_total_cost',
+        'actual_total_cost',
+        'justification',
+        'admin_approver_id',
+        'approval_rejection_timestamp',
+        'admin_comments',
+        'scheduled_installation_date',
+        'actual_completion_date'
+    ];
+    protected $casts = [
+        'installation_date' => 'datetime'
+    ];
     /**
      * Relasi ke Teknisi (User)
      */

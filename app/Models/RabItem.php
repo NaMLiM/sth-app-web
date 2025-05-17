@@ -11,11 +11,17 @@ class RabItem extends Model
         'name',
         'description',
         'unit_of_measure',
+        'quantity',
         'price',
         'category',
         'is_active',
         'created_by_user_id',
         'updated_by_user_id'
+    ];
+    protected $casts = [
+        'quantity' => 'decimal:2',
+        'price' => 'decimal:2',
+        'is_active' => 'boolean',
     ];
     public function createdBy()
     {

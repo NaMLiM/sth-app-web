@@ -5,17 +5,27 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
-use Filament\Forms;
+use Filament\Forms\Components\Group;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Hash; // Untuk hashing password
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -35,27 +45,27 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informasi Dasar Pengguna')
+                Section::make('Informasi Dasar Pengguna')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->label('Nama Lengkap')
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('email')
+                        TextInput::make('email')
                             ->label('Alamat Email')
                             ->email()
                             ->required()
                             ->maxLength(255)
                             ->unique(User::class, 'email', ignoreRecord: true),
-                        Forms\Components\TextInput::make('phone_number')
+                        TextInput::make('phone_number')
                             ->label('Nomor Telepon')
                             ->tel()
                             ->maxLength(20),
                     ])->columns(2),
 
-                Forms\Components\Section::make('Keamanan & Peran')
+                Section::make('Keamanan & Peran')
                     ->schema([
-                        Forms\Components\TextInput::make('password')
+                        TextInput::make('password')
                             ->label('Kata Sandi Baru')
                             ->password()
                             ->dehydrateStateUsing(fn($state) => Hash::make($state)) // Hash password sebelum disimpan
@@ -64,12 +74,12 @@ class UserResource extends Resource
                             ->confirmed() // Akan otomatis menambahkan field 'password_confirmation'
                             ->maxLength(255)
                             ->helperText('Kosongkan jika tidak ingin mengubah kata sandi saat edit.'),
-                        Forms\Components\TextInput::make('password_confirmation')
+                        TextInput::make('password_confirmation')
                             ->label('Konfirmasi Kata Sandi Baru')
                             ->password()
                             ->required(fn(string $context, callable $get): bool => $context === 'create' || filled($get('password')))
                             ->dehydrated(false), // Jangan simpan field konfirmasi ini ke database
-                        Forms\Components\Select::make('role')
+                        Select::make('role')
                             ->label('Peran Pengguna')
                             ->options([ // Sesuaikan dengan enum atau definisi peran Anda
                                 'technician' => 'Teknisi',
@@ -77,14 +87,14 @@ class UserResource extends Resource
                                 'supervisor' => 'Supervisor',
                             ])
                             ->required(),
-                        Forms\Components\Toggle::make('is_active')
+                        Toggle::make('is_active')
                             ->label('Status Akun Aktif')
                             ->default(true),
                     ])->columns(2),
 
-                Forms\Components\Section::make('Informasi Tambahan')
+                Section::make('Informasi Tambahan')
                     ->schema([
-                        Forms\Components\Placeholder::make('email_verified_at')
+                        Placeholder::make('email_verified_at')
                             ->label('Email Terverifikasi pada')
                             ->content(fn(?User $record): string => $record?->email_verified_at ? $record->email_verified_at->translatedFormat('d F Y, H:i:s') : 'Belum diverifikasi'),
                         // Tombol untuk memverifikasi email bisa ditambahkan sebagai custom action jika perlu
@@ -97,15 +107,15 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('id')->sortable(),
+                TextColumn::make('name')
                     ->label('Nama')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('role')
+                TextColumn::make('role')
                     ->label('Peran')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
@@ -116,20 +126,20 @@ class UserResource extends Resource
                     })
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('phone_number')
+                TextColumn::make('phone_number')
                     ->label('No. Telepon')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('email_verified_at')
+                TextColumn::make('email_verified_at')
                     ->label('Email Terverifikasi')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Tanggal Dibuat')
                     ->dateTime()
                     ->sortable()
@@ -150,10 +160,10 @@ class UserResource extends Resource
                     ->nullable(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make()
-                    ->before(function (User $record, Tables\Actions\DeleteAction $action) {
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make()
+                    ->before(function (User $record, DeleteAction $action) {
                         // Pencegahan agar tidak menghapus akun diri sendiri atau akun admin penting lainnya
                         if ($record->id === Auth::id()) {
                             $action->cancel();
@@ -167,8 +177,8 @@ class UserResource extends Resource
                     }),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

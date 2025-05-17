@@ -3,16 +3,27 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\RabItemResource\Pages;
-use App\Filament\Resources\RabItemResource\RelationManagers;
 use App\Models\RabItem;
-use Filament\Forms;
+use Dom\Text;
+use Filament\Forms\Components\Group;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload; // Jika menggunakan Spatie Media Library untuk gambar item, misalnya.
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 
 class RabItemResource extends Resource
 {
@@ -30,43 +41,53 @@ class RabItemResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Informasi Dasar Item RAB')
+                Section::make('Informasi Dasar Item RAB')
                     ->schema([
-                        Forms\Components\TextInput::make('item_code')
+                        TextInput::make('item_code')
                             ->label('Kode Item')
                             ->required()
                             ->maxLength(50)
                             ->unique(RabItem::class, 'item_code', ignoreRecord: true)
                             ->helperText('Kode unik untuk item ini, contoh: MAT-001, JSA-002.'),
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
                             ->label('Nama Item')
                             ->required()
                             ->maxLength(255)
                             ->columnSpanFull(),
-                        Forms\Components\Textarea::make('description')
+                        Textarea::make('description')
                             ->label('Deskripsi Item')
                             ->columnSpanFull()
                             ->rows(3),
                     ])->columns(1), // Atur layout kolom jika perlu
 
-                Forms\Components\Section::make('Detail Harga dan Satuan')
+                Section::make('Detail Harga dan Satuan')
                     ->schema([
-                        Forms\Components\TextInput::make('unit_of_measure')
+                        Select::make('unit_of_measure')
                             ->label('Satuan Unit')
-                            ->required()
-                            ->maxLength(50)
-                            ->helperText('Contoh: meter, pcs, jam, unit, ls (lumpsum).'),
-                        Forms\Components\TextInput::make('price')
+                            ->options([
+                                'pcs' => 'Pcs/Unit',
+                                'g' => 'Gram',
+                                'm' => 'Meter',
+                                'l' => 'Liter',
+                            ])
+                            ->required(),
+                        TextInput::make('price')
                             ->label('Harga Satuan')
                             ->numeric()
                             ->prefix('Rp')
                             ->required()
                             ->minValue(0),
-                        Forms\Components\TextInput::make('category')
+                        TextInput::make('category')
                             ->label('Kategori Item (Opsional)')
                             ->maxLength(100)
                             ->helperText('Contoh: Material Fiber Optik, Peralatan Pasif, Jasa Instalasi, Transportasi.'),
-                        Forms\Components\Toggle::make('is_active')
+                        TextInput::make('quantity')
+                            ->label('Jumlah Item')
+                            ->numeric()
+                            ->required()
+                            ->minValue(0)
+                            ->helperText('Jumlah item yang tersedia.'),
+                        Toggle::make('is_active')
                             ->label('Status Aktif')
                             ->default(true)
                             ->helperText('Jika tidak aktif, item tidak akan muncul saat pemilihan RAB.'),
@@ -74,20 +95,20 @@ class RabItemResource extends Resource
 
                 // Informasi audit (dibuat oleh, diubah oleh) bisa ditampilkan sebagai placeholder
                 // dan diisi secara otomatis oleh sistem.
-                Forms\Components\Group::make()
+                Group::make()
                     ->schema([
-                        Forms\Components\Placeholder::make('created_by_user_id')
+                        Placeholder::make('created_by_user_id')
                             ->label('Dibuat Oleh')
                             ->content(fn(?RabItem $record): string => $record?->createdBy?->name ?? 'Sistem')
                             ->visible(fn(string $operation) => $operation !== 'create'),
-                        Forms\Components\Placeholder::make('updated_by_user_id')
+                        Placeholder::make('updated_by_user_id')
                             ->label('Diperbarui Oleh')
                             ->content(fn(?RabItem $record): string => $record?->updatedBy?->name ?? 'Sistem')
                             ->visible(fn(string $operation) => $operation !== 'create'),
-                        Forms\Components\Placeholder::make('created_at')
+                        Placeholder::make('created_at')
                             ->label('Dibuat pada')
                             ->content(fn(?RabItem $record): ?string => $record?->created_at?->translatedFormat('d F Y, H:i:s')),
-                        Forms\Components\Placeholder::make('updated_at')
+                        Placeholder::make('updated_at')
                             ->label('Terakhir diubah')
                             ->content(fn(?RabItem $record): ?string => $record?->updated_at?->translatedFormat('d F Y, H:i:s')),
                     ])
@@ -100,63 +121,67 @@ class RabItemResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('item_code')
+                TextColumn::make('item_code')
                     ->label('Kode Item')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Nama Item')
                     ->searchable()
                     ->sortable()
                     ->limit(50)
                     ->tooltip(fn(RabItem $record): string => $record->name),
-                Tables\Columns\TextColumn::make('unit_of_measure')
+                TextColumn::make('quantity')
+                    ->label('Jumlah')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('unit_of_measure')
                     ->label('Satuan')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('price')
+                TextColumn::make('price')
                     ->label('Harga Satuan')
                     ->money('IDR')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('category')
+                TextColumn::make('category')
                     ->label('Kategori')
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true), // Bisa disembunyikan defaultnya
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->label('Terakhir Diubah')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('category')
+                SelectFilter::make('category')
                     ->options(
                         // Ambil opsi kategori unik dari database jika memungkinkan
                         // atau definisikan secara manual jika terbatas
                         RabItem::query()->select('category')->whereNotNull('category')->distinct()->pluck('category', 'category')->all()
                     )
                     ->searchable(),
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Status Aktif'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make() // Pastikan ada konfirmasi
-                    ->before(function (RabItem $record, Tables\Actions\DeleteAction $action) {
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make() // Pastikan ada konfirmasi
+                    ->before(function (RabItem $record, DeleteAction $action) {
                         // Tambahkan logika di sini jika item tidak boleh dihapus jika sudah terpakai di RAB
                         // Misalnya, cek apakah $record->rabJobItems()->exists()
                         // Jika iya, $action->cancel() atau $action->halt() dan kirim notifikasi error
                     }),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

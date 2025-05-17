@@ -16,7 +16,8 @@ return new class extends Migration
             $table->string('item_code', 50)->unique();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->string('unit_of_measure', 50);
+            $table->enum('unit_of_measure', ['pcs', 'g', 'm', 'l'])->default('pcs');
+            $table->decimal('quantity', 10, 2)->default(0);
             $table->decimal('price', 15, 2);
             $table->string('category', 100)->nullable();
             $table->boolean('is_active')->default(true);
